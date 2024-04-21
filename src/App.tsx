@@ -1,4 +1,4 @@
-import { Button, Typography, Upload } from 'antd';
+import { Button, Table, Typography, Upload } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import './App.css';
 import { useState } from 'react';
@@ -11,17 +11,11 @@ interface RowData {
     [key: string]: any;
 }
 
-interface IResult {
-    totalAmount: number;
-    totalSell: number;
-}
-
 function App() {
     const [fileList, setFileList] = useState<Array<any>>([]);
-    const [result, setResult] = useState<IResult>({
-        totalAmount: 0,
-        totalSell: 0
-    });
+
+    const [tableData, setTableData] = useState<Array<RowData> | undefined>(undefined);
+
 
     const handleConvert = () => {
         if (fileList.length > 0) {
@@ -42,31 +36,51 @@ function App() {
     };
 
     const calculate = (data: RowData[]) => {
-        let totalAmount = 0;
-        let totalSell = 0;
-
+        const groupedData: { [key: string]: { totalAmount: number, totalSell: number } } = {};
+    
         data.forEach((row) => {
-            if (typeof row['Кол-во'] === "number") {
-                totalAmount += parseFloat(row['Кол-во'].toString());
-            }
-
-            if (
-                typeof row['Вайлдберриз реализовал Товар (Пр)'] === "number" &&
-                typeof row['Тип документа'] === "string"
-            ) {
-                if (row['Тип документа'] === "Продажа") {
-                    totalSell += parseFloat(row['Вайлдберриз реализовал Товар (Пр)'].toString());
-                } else if (row['Тип документа'] === "Возврат") {
-                    totalSell -= parseFloat(row['Вайлдберриз реализовал Товар (Пр)'].toString());
+            const supplierCode = row['Артикул поставщика'];
+            const amount = typeof row['Кол-во'] === "number" ? parseFloat(row['Кол-во'].toString()) : 0;
+    
+            if (groupedData[supplierCode]) {
+                groupedData[supplierCode].totalAmount += amount;
+    
+                if (
+                    typeof row['Вайлдберриз реализовал Товар (Пр)'] === "number" &&
+                    typeof row['Тип документа'] === "string"
+                ) {
+                    if (row['Тип документа'] === "Продажа") {
+                        groupedData[supplierCode].totalSell += parseFloat(row['Вайлдберриз реализовал Товар (Пр)'].toString());
+                    } else if (row['Тип документа'] === "Возврат") {
+                        groupedData[supplierCode].totalSell -= parseFloat(row['Вайлдберриз реализовал Товар (Пр)'].toString());
+                    }
+                }
+            } else {
+                groupedData[supplierCode] = {
+                    totalAmount: amount,
+                    totalSell: 0
+                };
+    
+                if (
+                    typeof row['Вайлдберриз реализовал Товар (Пр)'] === "number" &&
+                    typeof row['Тип документа'] === "string" &&
+                    row['Тип документа'] === "Продажа"
+                ) {
+                    groupedData[supplierCode].totalSell = parseFloat(row['Вайлдберриз реализовал Товар (Пр)'].toString());
                 }
             }
         });
+    
+        const tableRows = Object.keys(groupedData).map(supplierCode => ({
+            supplierCode,
+            totalAmount: groupedData[supplierCode].totalAmount,
+            totalSell: groupedData[supplierCode].totalSell
+        }));
 
-        setResult({
-            totalAmount: totalAmount,
-            totalSell: totalSell
-        });
+        // Установка данных для таблицы
+        setTableData(tableRows);
     };
+    
 
     const customRequest = (option: any) => {
         const file = option.file;
@@ -78,6 +92,24 @@ function App() {
             originFileObj: file,
         }]);
     };
+
+    const columns = [
+        {
+            title: 'Артикул поставщика',
+            dataIndex: 'supplierCode',
+            key: 'supplierCode',
+        },
+        {
+            title: 'Общее количество',
+            dataIndex: 'totalAmount',
+            key: 'totalAmount',
+        },
+        {
+            title: 'Продажа',
+            dataIndex: 'totalSell',
+            key: 'totalSell',
+        },
+    ];
 
     return (
         <>
@@ -96,21 +128,13 @@ function App() {
                         <p className="ant-upload-hint">Поддерживается только формат xls и xlsx</p>
                     </Dragger>
                     <Button size='large' type='primary' onClick={handleConvert}>Получить результат</Button>
-                    {
-                        result.totalAmount > 0 && (
-                            <>
-                                <Title level={4}>
-                                    Результаты
-                                </Title>
-                                <Paragraph>
-                                    Общее количество: <Text strong>{result.totalAmount}</Text>
-                                </Paragraph>
-                                <Paragraph>
-                                    Продажа: <Text strong>{result.totalSell}</Text>
-                                </Paragraph>
-                            </>
-                        )
-                    }
+                     <div style={{ marginTop: 20 }}>
+                        {
+                            tableData && (
+                                <Table columns={columns} dataSource={tableData} pagination={false}/>
+                            )
+                        }
+                    </div>
                 </div>
             </div>
         </>
