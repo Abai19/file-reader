@@ -4,7 +4,7 @@ import './App.css';
 import { useState } from 'react';
 import * as XLSX from "xlsx";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title } = Typography;
 const { Dragger } = Upload;
 
 interface RowData {
